@@ -1,0 +1,28 @@
+- hosts: astro2
+  vars:
+    srcdir: /mnt/e/dev/meteorhunting/rbassom_meteorradio/src
+    destdir: ~/source/radiometeor
+  tasks:
+  - name: Ensures {{destdir}} exists
+    file: path={{destdir}} state=directory  
+
+  - name: Copy files
+    copy: src={{ item.src }} dest={{ item.dest }} mode={{ item.mode }}
+    with_items:
+    - {src: '{{srcdir}}/analyse_detection.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/audio_analyse.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/graph_logs.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/match_radar_visual.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/meteor_radar.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/monthly_csv_file.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/monthly_graph.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/monthly_rmob.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/sample_analyser.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/waterfall.py', dest: '{{destdir}}/', mode: '644', backup: yes }
+
+    - {src: '{{srcdir}}/setup.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
+    - {src: '{{srcdir}}/run.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
+    - {src: '{{srcdir}}/requirements.txt', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/.radar_config.sample', dest: '{{destdir}}/', mode: '644', backup: yes }
+    - {src: '{{srcdir}}/radar_log_update.bash', dest: '{{destdir}}/', mode: '754', backup: yes }
+    - {src: '{{srcdir}}/create_hourly_radar_graph.bash', dest: '{{destdir}}/', mode: '754', backup: yes }

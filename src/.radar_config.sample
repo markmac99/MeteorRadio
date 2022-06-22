@@ -1,0 +1,10 @@
+stationID: Mylocation ; Geographical location of the receiver
+longitude: -1.999     ; Geographical longitude of the receiver
+latitude: 50.999      ; Geographical latitude of the receiver
+elevation: 24         ; Altitude above sea level of the receiver in metres
+ID_NUM: 17            ; ID number used for Radio Meteor Detection Collaboration Project
+foff: -60             ; Measured frequency offset of the receiver in Hz
+TxSource: GRAVES      ; Name of the tranmitter
+TimeSync: NTP         ; Time synchronisation method
+country: UK           ; Country
+region: Myregion      ; Region within country
