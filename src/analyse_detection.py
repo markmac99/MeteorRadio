@@ -60,7 +60,7 @@ class MeteorPlotter():
 
     def __init__(self):
 
-        self.cmap_color = 'gist_heat'
+        self.cmap_color = 'winter' # 'gist_heat'
         self.cmap_color_list = plt.colormaps()
         self.cmap_index = self.cmap_color_list.index(self.cmap_color)
         self.last_deleted_file_queue = LifoQueue()
@@ -85,13 +85,12 @@ class MeteorPlotter():
         # Move data and audio file to Archive folder
         if event.key == 'a':
             os.chmod(self.file_name, S_IREAD | S_IRGRP | S_IROTH)
-            try:
+            print(f'moving {self.file_name}')
+            if os.path.isfile(self.file_name):
                 shutil.move(self.file_name, os.path.join(ARCHIVE_DIR, os.path.basename(self.file_name)))
-                audio_file = self.file_name.replace("SPG", "AUD")
-                audio_file = audio_file.replace("npz", "raw")
-                shutil.move(audio_file, os.path.join(ARCHIVE_DIR, os.path.basename(audio_file)))
-            except: 
-                pass
+            audio_file = os.path.basename(self.file_name).replace("SPG", "AUD").replace("npz", "raw")
+            if os.path.isfile(audio_file):
+                shutil.move(audio_file, os.path.join(ARCHIVE_DIR, audio_file))
             plt.close()
         elif event.key == 'c':
             try:
