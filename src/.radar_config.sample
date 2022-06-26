@@ -8,3 +8,6 @@ TxSource: GRAVES      ; Name of the tranmitter
 TimeSync: NTP         ; Time synchronisation method
 country: UK           ; Country
 region: Myregion      ; Region within country
+flipped: False        ; if True, x axis is time, y axis is frequency
+autosave: False       ; if True, jpgs and pngs are automatically created
+datadir: ~/radar_data ; root location of data files

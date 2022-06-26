@@ -22,6 +22,7 @@
 
     - {src: '{{srcdir}}/setup.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
     - {src: '{{srcdir}}/run.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
+    - {src: '{{srcdir}}/convertToWav.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
     - {src: '{{srcdir}}/requirements.txt', dest: '{{destdir}}/', mode: '644', backup: yes }
     - {src: '{{srcdir}}/.radar_config.sample', dest: '{{destdir}}/', mode: '644', backup: yes }
     - {src: '{{srcdir}}/radar_log_update.bash', dest: '{{destdir}}/', mode: '754', backup: yes }
