@@ -6,6 +6,7 @@ import matplotlib.patheffects as path_effects
 from matplotlib.mlab import specgram
 import scipy.interpolate as si
 import os
+import sys
 import shutil
 from stat import S_IREAD, S_IRGRP, S_IROTH
 import signal
@@ -13,13 +14,14 @@ import argparse
 import glob
 from queue import LifoQueue
 import matplotlib
+from play_audio import convertRawToWav, playFile
 
 FULL_FREQUENCY_BAND = 1000   # Band for psd plot is +/- 1000 Hz
 SPECGRAM_BAND = 500     # Band for displaying specgram plots is +/-500
 DATA_DIR = os.path.expanduser('~/radar_data')
-ARCHIVE_DIR = os.path.expanduser('~/radar_data/Archive')
-CAPTURE_DIR = os.path.expanduser('~/radar_data/Captures')
-JUNK_DIR = os.path.expanduser('~/radar_data/Junk')
+ARCHIVE_DIR = os.path.expanduser(os.path.join(DATA_DIR,'Archive'))
+CAPTURE_DIR = os.path.expanduser(os.path.join(DATA_DIR,'Captures'))
+JUNK_DIR = os.path.expanduser(os.path.join(DATA_DIR,'Junk'))
 
 OVERLAP = 0.75           # Overlap (0.75 is 75%)
 
@@ -88,15 +90,15 @@ class MeteorPlotter():
             print(f'moving {self.file_name}')
             if os.path.isfile(self.file_name):
                 shutil.move(self.file_name, os.path.join(ARCHIVE_DIR, os.path.basename(self.file_name)))
-            audio_file = os.path.basename(self.file_name).replace("SPG", "AUD").replace("npz", "raw")
+            audio_file = self.file_name.replace("SPG", "AUD").replace("npz", "raw")
+            print(f'moving {audio_file}')
             if os.path.isfile(audio_file):
-                shutil.move(audio_file, os.path.join(ARCHIVE_DIR, audio_file))
+                shutil.move(audio_file, os.path.join(ARCHIVE_DIR, os.path.basename(audio_file)))
             plt.close()
         elif event.key == 'c':
             try:
                 shutil.move(self.file_name, os.path.join(CAPTURE_DIR, os.path.basename(self.file_name)))
-                audio_file = self.file_name.replace("SPG", "AUD")
-                audio_file = audio_file.replace("npz", "raw")
+                audio_file = self.file_name.replace("SPG", "AUD").replace("npz", "raw")
                 shutil.move(audio_file, os.path.join(CAPTURE_DIR, os.path.basename(audio_file)))
             except: 
                 pass
@@ -104,30 +106,39 @@ class MeteorPlotter():
 
         # Undo last delete
         elif event.key == 'u':
-            try:
-                last_deleted_file = self.last_deleted_file_queue.get_nowait()
-                shutil.move(os.path.join(JUNK_DIR, os.path.basename(last_deleted_file)), last_deleted_file)
-                audio_file = last_deleted_file.replace("SPG", "AUD")
-                audio_file = audio_file.replace("npz", "raw")
+            last_deleted_file = self.last_deleted_file_queue.get_nowait()
+            shutil.move(os.path.join(JUNK_DIR, os.path.basename(last_deleted_file)), last_deleted_file)
+            audio_file = last_deleted_file.replace("SPG", "AUD").replace("npz", "raw")
+            if os.path.isfile(audio_file):
                 shutil.move(os.path.join(JUNK_DIR, os.path.basename(audio_file)), audio_file)
-            except Exception as e:
-                print(e)
+            audio_file = last_deleted_file.replace("SPG", "AUD").replace("npz", "wav")
+            if os.path.isfile(audio_file):
+                shutil.move(os.path.join(JUNK_DIR, os.path.basename(audio_file)), audio_file)
 
         # Move data and audio file to Junk folder. Backspace key moves back to previous file
         elif event.key == 'delete' or event.key == 'backspace':
-            try:
-                if event.key == 'backspace': 
-                    file_index_movement = -1
-                else: 
-                    file_index_movement = 1
-                shutil.move(self.file_name, os.path.join(JUNK_DIR, os.path.basename(self.file_name)))
-                self.last_deleted_file_queue.put_nowait(self.file_name)
-                audio_file = self.file_name.replace("SPG", "AUD")
-                audio_file = audio_file.replace("npz", "raw")
-                shutil.move(audio_file, os.path.join(JUNK_DIR, os.path.basename(audio_file)))
-            except Exception as e:
-                print(e)
+            if event.key == 'backspace': 
+                file_index_movement = -1
+            else: 
+                file_index_movement = 1
             plt.close()
+            if os.path.isfile(os.path.join(JUNK_DIR, os.path.basename(self.file_name))):
+                os.remove(os.path.join(JUNK_DIR, os.path.basename(self.file_name)))
+            shutil.move(self.file_name, os.path.join(JUNK_DIR, os.path.basename(self.file_name)))
+            self.last_deleted_file_queue.put_nowait(self.file_name)
+
+            audio_file = self.file_name.replace("SPG", "AUD").replace("npz", "raw")
+            if os.path.isfile(os.path.join(JUNK_DIR, os.path.basename(audio_file))):
+                os.remove(os.path.join(JUNK_DIR, os.path.basename(audio_file)))
+            if os.path.isfile(audio_file):
+                shutil.move(audio_file, os.path.join(JUNK_DIR, os.path.basename(audio_file)))
+
+            audio_file = self.file_name.replace("SPG", "AUD").replace("npz", "wav")
+            if os.path.isfile(os.path.join(JUNK_DIR, os.path.basename(audio_file))):
+                os.remove(os.path.join(JUNK_DIR, os.path.basename(audio_file)))
+            if os.path.isfile(audio_file):
+                shutil.move(audio_file, os.path.join(JUNK_DIR, os.path.basename(audio_file)))
+
         elif event.key == 'escape':
             os._exit(0)
         elif event.key == '3':                 # 3 key shows the 3d plot
@@ -171,20 +182,19 @@ class MeteorPlotter():
                 x7.astype("int16").tofile(audio_filename)
 
                 try:
-                    os.system('play -r 37.5k -b 16 -e signed-integer -c 1 ' + audio_filename + " sinc 1500-3000 &")
-                    os.system('sox -r 37.5k -b 16 -e signed-integer -c 1 ' + audio_filename + " " + wav_filename + " &")
+                    wav_file = convertRawToWav(audio_filename)
+                    playFile(wav_filename)
                 except: 
                     pass
 
             else:
-                try:
-                    audio_file = self.file_name.replace("SPG", "AUD")
-                    audio_file = audio_file.replace("npz", "raw")
-                    wav_file = audio_file.replace("raw", "wav")
-                    os.system('play -r 37.5k -b 16 -e signed-integer -c 1 ' + audio_file + " sinc 1500-3000 &")
-                    os.system('sox -r 37.5k -b 16 -e signed-integer -c 1 ' + audio_file + " " + wav_file + " &")
-                except:
-                    pass
+                audio_file = self.file_name.replace("SPG", "AUD").replace("npz", "raw")
+                if os.path.isfile(audio_file):
+                    wav_file = convertRawToWav(audio_file)
+                    print("Saving", wav_file)
+                    playFile(wav_file)
+                else:
+                    print('audio file not found')
 
         elif event.key == '+':
             self.cmap_index += 1
@@ -354,7 +364,7 @@ class MeteorPlotter():
 
 
 def get_observation_data(filename):
-    file, _ = os.path.splitext(filename)
+    file, _ = os.path.splitext(os.path.basename(filename))
     nameparts = file.split('_')
     centre_freq = float(nameparts[1])
     if len(nameparts) > 5:
@@ -402,7 +412,8 @@ def get_capture_stats(Pxx, f, bins):
 # Main program
 if __name__ == "__main__":
 
-    matplotlib.use('TkAgg')
+    if sys.platform == 'Linux':
+        matplotlib.use('TkAgg')
     # Add some signal handlers to trap SIGKILL and SIGTERM so we can close
     # down gracefully
     signal.signal(signal.SIGINT,signalHandler)
@@ -416,6 +427,7 @@ if __name__ == "__main__":
     ap.add_argument("-c", "--combine", action='store_true', help="Combine data from npz files for plotting")
     ap.add_argument("-t", "--sortbyctime", action='store_true', help="View files sorted by ctime")
     ap.add_argument("-i", "--flipped", action='store_true', help="Swap x/y axes")
+    ap.add_argument('-o', "--output_dir", type=str, help="where to save the output", default=None)
     # ap.add_argument("-f", "--frequency", type=float, default=143.05e6, help="Centre frequency")
     # ap.add_argument("-r", "--rate", type=int, default=960000, help="Sample rate")
     # ap.add_argument("-3", "--3d", action='store_true', help="Show 3d specgram")
@@ -428,6 +440,7 @@ if __name__ == "__main__":
     combine = args['combine']
     sort_by_ctime = args['sortbyctime']
     flipped = args['flipped']
+    outdir = args['output_dir']
     # sample_rate = args['rate']
     # centre_freq = args['frequency']
     # show_3d = args['3d']
@@ -436,6 +449,14 @@ if __name__ == "__main__":
     print(HELP_TEXT)
 
     # Make directories required
+    if outdir is not None:
+        print(f'writing to {outdir}')
+        DATA_DIR = os.path.expanduser(outdir)
+        
+    ARCHIVE_DIR = os.path.expanduser(os.path.join(DATA_DIR,'Archive'))
+    CAPTURE_DIR = os.path.expanduser(os.path.join(DATA_DIR,'Captures'))
+    JUNK_DIR = os.path.expanduser(os.path.join(DATA_DIR,'Junk'))
+
     make_directories()
 
     # Create a meteor plotter object
@@ -454,11 +475,12 @@ if __name__ == "__main__":
             obs_times.append(new_obs_time)
 
             # Unpack the data
-            npz_data = np.load(file_name)
+            with open(file_name, 'rb') as inf:
+                npz_data = np.load(inf)
 
-            new_bins = npz_data['bins']
-            new_f = npz_data['f']
-            new_Pxx = npz_data['Pxx']
+                new_bins = npz_data['bins']
+                new_f = npz_data['f']
+                new_Pxx = npz_data['Pxx']
 
             # Set the variables for the first observation
             if len(obs_times) == 1:
@@ -494,13 +516,14 @@ if __name__ == "__main__":
         for index, file_name in enumerate(file_names):
             # Unpack the data
             obs_time, centre_freq, sample_rate = get_observation_data(file_name)
-            npz_data = np.load(file_name)
+            with open(file_name, 'rb') as inf:
+                npz_data = np.load(inf)
 
-            bins = npz_data['bins']
-            if sample_rate is not None: 
-                bins /= sample_rate
-            f = npz_data['f']
-            Pxx = npz_data['Pxx']
+                bins = npz_data['bins']
+                if sample_rate is not None: 
+                    bins /= sample_rate
+                f = npz_data['f']
+                Pxx = npz_data['Pxx']
 
             meteor_plotter.set_file_name(file_name)
             meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=flipped, save_images=True, noplot=True)
@@ -525,6 +548,7 @@ if __name__ == "__main__":
     if sort_by_ctime: 
         filenames.sort(key=os.path.getctime)
 
+    delflags=np.zeros(len(filenames))
 
     # Loop through files, displaying plots
     while file_index < len(filenames):
@@ -538,29 +562,31 @@ if __name__ == "__main__":
             # If this is specgram data, plot the spectrogram only
             if 'SPG' in filename and 'npz' in filename:
                 # Get the np data from file
-                npz_data = np.load(filename)
+                with open(filename, 'rb') as inf:
+                    npz_data = np.load(inf)
 
-                # Extract the FFT data. bins is time in seconds, but old format required division by the sample rate
-                bins = npz_data['bins']
-                if sample_rate is not None: 
-                    bins /= sample_rate
-                f = npz_data['f']
-                Pxx = npz_data['Pxx']
+                    # Extract the FFT data. bins is time in seconds, but old format required division by the sample rate
+                    bins = npz_data['bins']
+                    if sample_rate is not None: 
+                        bins /= sample_rate
+                    f = npz_data['f']
+                    Pxx = npz_data['Pxx']
 
                 meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=flipped)
                 # if show_3d : plot_3dspecgram(Pxx, f, bins, centre_freq)
 
             # If this is raw sample data, create the spectrogram display data and display it
             if 'SMP' in filename and 'npz' in filename:
-                npz_data = np.load(filename)
-                samples = npz_data['samples']
-                sample_rate = DEFAULT_SAMPLE_RATE
-                try:
-                    centre_freq = npz_data['centre_freq']
-                    sample_rate = npz_data['sample_rate']
-                    obs_time = datetime.datetime.strptime(str(npz_data['obs_time']), "%Y-%m-%d %H:%M:%S.%f")
-                except Exception as e:
-                    print(e)
+                with open(filename, 'rb') as inf:
+                    npz_data = np.load(inf)
+                    samples = npz_data['samples']
+                    sample_rate = DEFAULT_SAMPLE_RATE
+                    try:
+                        centre_freq = npz_data['centre_freq']
+                        sample_rate = npz_data['sample_rate']
+                        obs_time = datetime.datetime.strptime(str(npz_data['obs_time']), "%Y-%m-%d %H:%M:%S.%f")
+                    except Exception as e:
+                        print(e)
 
                 Pxx, f, bins = specgram(samples, NFFT=2**12, Fs=DEFAULT_SAMPLE_RATE, noverlap=OVERLAP*(2**12))
                 freq_slice = np.where((f > 1500) & (f <= 2500))
@@ -570,10 +596,13 @@ if __name__ == "__main__":
                 Pxx = Pxx[freq_slice,:][0]
 
                 meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=flipped)
-
-
+        else:
+            delflags[file_index] = 1
+            
         file_index += file_index_movement
-
+        print(file_index)
+        if sum(delflags) == len(filenames):
+            break
         # Allow the index to be circular
         if file_index == len(filenames): 
             file_index = 0
