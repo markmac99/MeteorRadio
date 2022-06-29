@@ -56,19 +56,20 @@ def processAudio(inputFilename, output_dir=None):
     plt.gca().format_coord = fmt
     #"""
 
-    # handle case when running as a subprocess without an attached display
-    try: 
-        plt.show()
-    except:
-        pass
-
-    
     if output_dir is not None:
         outfname = inputFilename.replace('raw','jpg')
         _, fname = os.path.split(outfname)
         outfname = os.path.join(output_dir, fname)
         print(f'saving to {outfname}')
         plt.savefig(outfname)
+    else:
+        # handle case when running as a subprocess without an attached display
+        try: 
+            plt.show()
+        except:
+            pass
+    plt.clf()
+    plt.close()
 
 
 # Main program
