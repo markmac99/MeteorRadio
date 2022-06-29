@@ -2,4 +2,5 @@ numpy
 scipy
 matplotlib
 pandas
+ffpyplayer
 #pylab
