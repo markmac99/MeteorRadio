@@ -9,6 +9,7 @@
   - name: Copy files
     copy: src={{ item.src }} dest={{ item.dest }} mode={{ item.mode }}
     with_items:
+    - {src: '{{srcdir}}/createEventLogFile.py', dest: '{{destdir}}/', mode: '644', backup: yes }
     - {src: '{{srcdir}}/analyse_detection.py', dest: '{{destdir}}/', mode: '644', backup: yes }
     - {src: '{{srcdir}}/audio_analyse.py', dest: '{{destdir}}/', mode: '644', backup: yes }
     - {src: '{{srcdir}}/graph_logs.py', dest: '{{destdir}}/', mode: '644', backup: yes }
@@ -21,6 +22,7 @@
     - {src: '{{srcdir}}/waterfall.py', dest: '{{destdir}}/', mode: '644', backup: yes }
     - {src: '{{srcdir}}/play_audio.py', dest: '{{destdir}}/', mode: '644', backup: yes }
 
+    - {src: '{{srcdir}}/dailyHousekeeping.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
     - {src: '{{srcdir}}/push2s3.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
     - {src: '{{srcdir}}/setup.sh', dest: '{{destdir}}/', mode: '754', backup: yes }
     - {src: '{{srcdir}}/run.sh', dest: '{{destdir}}/', mode: '754', backup: yes }

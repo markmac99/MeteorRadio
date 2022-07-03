@@ -6,6 +6,9 @@ source ~/venvs/radiometeor/bin/activate
 eval datadir=$(grep datadir ~/.radar_config | awk '{print $2}')
 
 cd $datadir
-logf=$(ls -1 Logs/event*.csv | tail -1)
-bn=$(basename $logf)
-aws s3 cp $logf s3://mjmm-rawradiodata/tmp/${bn} --profile=default
+dtstr=$(date +%Y%m)
+logf=event_log_${dtstr}.csv
+fullname=$datadir/Logs/$logf
+
+python ~/source/radiometeor/createEventLogFile.py $dtstr
+aws s3 cp ${fullname} s3://mjmm-rawradiodata/raw/${logf} --profile=default

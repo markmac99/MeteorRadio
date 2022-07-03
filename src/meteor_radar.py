@@ -1,4 +1,4 @@
-from rtlsdr import *
+from rtlsdr import RtlSdr
 import asyncio
 import numpy as np
 import datetime
@@ -18,9 +18,9 @@ from multiprocessing import Process, Queue as mpQueue
 from waterfall import Waterfall
 
 DATA_DIR =  os.path.expanduser('~/radar_data/')
-CAPTURES_DIR = DATA_DIR + 'Captures/'
-ARCHIVE_DIR = DATA_DIR + 'Archive/'
-LOG_DIR = DATA_DIR + 'Logs/'
+CAPTURES_DIR = os.path.join(DATA_DIR, 'Captures')
+ARCHIVE_DIR = os.path.join(DATA_DIR, 'Archive')
+LOG_DIR = os.path.join(DATA_DIR, 'Logs')
 CONFIG_FILE = os.path.expanduser('~/.radar_config')
 
 SAMPLES_LENGTH = 24                   # Length of the deque for recording samples data
@@ -94,12 +94,13 @@ class RMBLogger():
         config_file_name = CONFIG_FILE
         try:
             with open(config_file_name) as fp:
-                for cnt, line in enumerate(fp):
-                    line_words = (re.split("[: \n]+", line))
-                    if line_words[0] == 'stationID' : self.id = line_words[1]
-                    if line_words[0] == 'latitude'  : self.Lat = float(line_words[1])
-                    if line_words[0] == 'longitude' : self.Long = float(line_words[1])
-                    if line_words[0] == 'elevation' : self.Alt = float(line_words[1])
+                lines = fp.readlines()
+            for line in lines:
+                line_words = (re.split("[: \n]+", line))
+                if line_words[0] == 'stationID' : self.id = line_words[1]
+                if line_words[0] == 'latitude'  : self.Lat = float(line_words[1])
+                if line_words[0] == 'longitude' : self.Long = float(line_words[1])
+                if line_words[0] == 'elevation' : self.Alt = float(line_words[1])
 
         except Exception as e :
             print(e)
@@ -110,21 +111,17 @@ class RMBLogger():
     # Write to RMB format R<date>_<location>.csv file as:
     # Ver,Y,M,D,h,m,s,Bri,Dur,freq,ID,Long,Lat,Alt,Tz
     def log_data(self,obs_time,Bri,Dur,freq) :
-        filename = "R" + obs_time.strftime("%Y%m%d_") + self.id + ".csv"
-        try:
-            rmb_file = open(LOG_DIR + filename, "r")
-            rmb_file.close()
-        except:
-            rmb_file = open(LOG_DIR + filename, "a")
-            rmb_file.write("Ver,Y,M,D,h,m,s,Bri,Dur,freq,ID,Long,Lat,Alt,Tz\n")
-            rmb_file.close()
+        filename = os.path.join(LOG_DIR, f'R{obs_time.strftime("%Y%m%d")}_{self.id}.csv')
+
+        if not os.path.isfile(filename):
+            with open(filename, "a") as rmb_file:
+                rmb_file.write("Ver,Y,M,D,h,m,s,Bri,Dur,freq,ID,Long,Lat,Alt,Tz\n")
 
         try:
-            rmb_file = open(LOG_DIR + filename, "a")
-            rmb_string = '{0:s},{1:s},{2:.2f},{3:.2f},{4:.2f},{5:s},{6:.5f},{7:.5f},{8:.1f},{9:d}\n'.format(self.Ver, obs_time.strftime("%Y,%m,%d,%H,%M,%S.%f")[:-3], Bri, Dur, freq, self.id, self.Long, self.Lat, self.Alt, self.Tz)
-            syslog.syslog(syslog.LOG_DEBUG, "Writing to RMB file " + filename + " " + rmb_string)
-            rmb_file.write(rmb_string)
-            rmb_file.close()
+            with open(filename, "a") as rmb_file:
+                rmb_string = '{0:s},{1:s},{2:.2f},{3:.2f},{4:.2f},{5:s},{6:.5f},{7:.5f},{8:.1f},{9:d}\n'.format(self.Ver, obs_time.strftime("%Y,%m,%d,%H,%M,%S.%f")[:-3], Bri, Dur, freq, self.id, self.Long, self.Lat, self.Alt, self.Tz)
+                syslog.syslog(syslog.LOG_DEBUG, "Writing to RMB file " + filename + " " + rmb_string)
+                rmb_file.write(rmb_string)
         except Exception as e :
             syslog.syslog(syslog.LOG_DEBUG, str(e))
 
@@ -146,30 +143,26 @@ class MonthlyCsvLogger():
         config_file_name = CONFIG_FILE
         try:
             with open(config_file_name) as fp:
-                for cnt, line in enumerate(fp):
-                    line_words = (re.split("[: \n]+", line))
-                    if line_words[0] == 'ID_NUM'    : self.id = line_words[1]
-                    if line_words[0] == 'latitude'  : self.Lat = float(line_words[1])
-                    if line_words[0] == 'longitude' : self.Long = float(line_words[1])
-                    if line_words[0] == 'foff'      : self.foff = float(line_words[1])
-                    if line_words[0] == 'TxSource'  : self.tx_source = line_words[1]
-                    if line_words[0] == 'TimeSync'  : self.time_sync = line_words[1]
-
+                lines = fp.readlines()
+            for line in lines: 
+                line_words = (re.split("[: \n]+", line))
+                if line_words[0] == 'ID_NUM'    : self.id = line_words[1]
+                if line_words[0] == 'latitude'  : self.Lat = float(line_words[1])
+                if line_words[0] == 'longitude' : self.Long = float(line_words[1])
+                if line_words[0] == 'foff'      : self.foff = float(line_words[1])
+                if line_words[0] == 'TxSource'  : self.tx_source = line_words[1]
+                if line_words[0] == 'TimeSync'  : self.time_sync = line_words[1]
         except Exception as e :
             print(e)
             syslog.syslog(syslog.LOG_DEBUG, str(e))
 
 
     def log_data(self, obs_time, centre_freq, frequency, signal, noise, duration, max_snr) :
+        filename = os.path.join(LOG_DIR, f'{obs_time.strftime("%Y-%m")}.csv')
 
-        try:
-            filename = obs_time.strftime('%Y-%m.csv')
-            csv_file = open(LOG_DIR + filename, "r")
-            csv_file.close()
-        except:
-            csv_file = open(LOG_DIR + filename, "a")
-            csv_file.write("user_ID,date,time,signal,noise,frequency,durationc,durations,lat,long,source,timesync,snratio,doppler_estimate\n")
-            csv_file.close()
+        if not os.path.isfile(filename):
+            with open(filename, "a") as csv_file:
+                csv_file.write("user_ID,date,time,signal,noise,frequency,durationc,durations,lat,long,source,timesync,snratio,doppler_estimate\n")
 
         try:
             date = obs_time.strftime('%Y-%m-%d')
@@ -180,10 +173,8 @@ class MonthlyCsvLogger():
             output_line = "%s,%s,%s,%.3f,%.3f,%s,%s,%.2f,%.2f,%.2f,%s,%s,%.2f,%s\n" % (self.id, date, time, signal, noise, offset_frequency, '0', duration, self.Lat, self.Long, self.tx_source, self.time_sync, max_snr, doppler_estimate)
             if verbose : print("csv output:", output_line)
 
-            filename = obs_time.strftime('%Y-%m.csv')
-            csv_file = open(LOG_DIR + filename, "a")
-            csv_file.write(output_line)
-            csv_file.close()
+            with open(filename, "a") as csv_file:
+                csv_file.write(output_line)
         except Exception as e :
             syslog.syslog(syslog.LOG_DEBUG, str(e))
             # print(str(e))
@@ -221,7 +212,6 @@ class CaptureStatistics() :
             times_gt_thresh = self.bins[np.where(np.any(self.Pxx > self.raw_median * self.snr_threshold, axis = 0))]
             if len(times_gt_thresh) > 0 :
                 prev_time = times_gt_thresh[0]
-                det_start_time = 0.0
                 for det_time in times_gt_thresh :
                     if det_time - prev_time > 1.0 :
                         break
@@ -234,7 +224,6 @@ class CaptureStatistics() :
             # Find initial frequency of detection
             Pxx_snr = self.Pxx/self.raw_median
             s = np.nonzero(Pxx_snr > self.snr_threshold)
-            imin, imax = np.min(s[1]), np.max(s[1])
             self.detection_freq = self.f[s[0][-1]]
         except Exception as e : print(e)
 
@@ -376,7 +365,7 @@ class SampleAnalyser(threading.Thread):
         # Do a first PSD to get frequency bands
         # decimated_samples = scipy_signal.decimate(samples, DECIMATION)
         # Pxx, f, bins = specgram(decimated_samples, NFFT=int(NUM_FFT/DECIMATION), Fs=self.decimated_sample_rate/1e6, noverlap=int(OVERLAP*(NUM_FFT/DECIMATION)))
-        Pxx, f, bins = specgram(samples, NFFT=int(NUM_FFT), Fs=self.sdr_sample_rate/1e6, noverlap=int(ANALYSIS_OVERLAP*NUM_FFT))
+        Pxx, f, _ = specgram(samples, NFFT=int(NUM_FFT), Fs=self.sdr_sample_rate/1e6, noverlap=int(ANALYSIS_OVERLAP*NUM_FFT))
 
         f += self.sdr_freq_mhz
         self.noise_calculation_band = np.where((f*1e6 > (self.centre_freq + noise_calculation_band[0])) & (f*1e6 <= (self.centre_freq + noise_calculation_band[1])))
@@ -462,7 +451,7 @@ class SampleAnalyser(threading.Thread):
 
         # Change the capture directory to Captures/{date} if required
         if capturetodated :
-            self.captures_dir = CAPTURES_DIR + obs_time.strftime('%Y%m%d') +'/'
+            self.captures_dir = os.path.join(CAPTURES_DIR, obs_time.strftime('%Y%m%d'))
             os.makedirs(self.captures_dir, exist_ok=True)
             pass
 
@@ -500,7 +489,7 @@ class SampleAnalyser(threading.Thread):
         decimated_samples = scipy_signal.decimate(raw_samples, DECIMATION)
 
         # Save the decimated raw samples
-        sample_filename = self.captures_dir + '/SMP_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.npz')
+        sample_filename = os.path.join(self.captures_dir, f"SMP_{centre_freq:0.0f}_{obs_time.strftime('%Y%m%d_%H%M%S_%f')}.npz")
         syslog.syslog(syslog.LOG_DEBUG, "Saving " + sample_filename)
         print("Saving", sample_filename)
         np.savez(sample_filename, obs_time=str(obs_time), centre_freq=centre_freq, sample_rate=self.decimated_sample_rate, samples=np.array(decimated_samples).astype("complex64"))
@@ -548,7 +537,7 @@ class SampleAnalyser(threading.Thread):
         # bins -= time_before_trigger
 
         # Save the data
-        specgram_filename = self.captures_dir + '/SPG_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.npz')
+        specgram_filename = os.path.join(self.captures_dir, f"SPG_{centre_freq:0.0f}_{obs_time.strftime('%Y%m%d_%H%M%S_%f')}.npz")
         syslog.syslog(syslog.LOG_DEBUG, "Saving " + specgram_filename)
         print("Saving", specgram_filename)
         np.savez(specgram_filename, Pxx=Pxx, f=f, bins=bins)
@@ -572,7 +561,7 @@ class SampleAnalyser(threading.Thread):
 
         # Save to file as 16-bit signed single-channel audio samples
         # Note that we can throw away the imaginary part of the IQ sample data for USB
-        audio_filename = self.captures_dir + '/AUD_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.raw')
+        audio_filename = os.path.join(self.captures_dir, f"AUD_{centre_freq:0.0f}_{obs_time.strftime('%Y%m%d_%H%M%S_%f')}.raw")
         syslog.syslog(syslog.LOG_DEBUG, "Saving " + audio_filename)
         print("Saving", audio_filename)
         x7.astype("int16").tofile(audio_filename)
@@ -651,7 +640,7 @@ class SampleAnalyser(threading.Thread):
                     if diff_pos == 1 or diff_pos == (x.shape[1]-1) :
                         # print("2 successive")
 
-                    # Check last 2 in deque for an overlap in frequencies
+                        # Check last 2 in deque for an overlap in frequencies
                         # print(self.fmax3_deque[-2], self.fmax3_deque[-1])
                         if abs(self.fmax3_deque[-2][1][0] - self.fmax3_deque[-1][1][0]) < 3 :
                             print("Overlap:", self.fmax3_deque[-2], self.fmax3_deque[-1])
@@ -753,7 +742,7 @@ if __name__ == "__main__":
     sample_analyser.start()
 
     # Start the waterfall display
-    if  display_waterfall :
+    if display_waterfall :
         p = Waterfall(centre_freq + FREQUENCY_OFFSET, SAMPLE_RATE, waterfall_queue)
         p.start()
 
