@@ -3,16 +3,14 @@ import datetime
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patheffects as path_effects
-from matplotlib.mlab import specgram
 import scipy.interpolate as si
 from scipy.signal import ShortTimeFFT
-from scipy.signal.windows import gaussian, hamming
+from scipy.signal.windows import hamming
 import os
 import shutil
 from stat import S_IREAD, S_IRGRP, S_IROTH
 import signal
 import argparse
-import re
 import glob
 from queue import LifoQueue
 import wave
@@ -577,7 +575,7 @@ if __name__ == "__main__":
             # Get observation data from file name e.g. SPG_143050000_300000_20210204_222326_281976.npz
             obs_time, centre_freq, sample_rate = get_observation_data(filename)
             meteor_plotter.set_file_name(filename)
-
+            meteor_plotter.set_colour(colour_scheme)
             # If this is specgram data, plot the spectrogram only
             if 'SPG' in filename and 'npz' in filename :
                 # Get the np data from file
@@ -588,7 +586,7 @@ if __name__ == "__main__":
                 if sample_rate is not None : bins /= sample_rate
                 f = npz_data['f']
                 Pxx = npz_data['Pxx']
-                meteor_plotter.set_colour(colour_scheme)
+
                 meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=False)
                 # if show_3d : plot_3dspecgram(Pxx, f, bins, centre_freq)
 
@@ -625,7 +623,6 @@ if __name__ == "__main__":
                     if file_index == num_smp_files-1 :
                         os._exit(0)
                 else:
-                    meteor_plotter.set_colour(colour_scheme)
                     meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=False)
 
 
