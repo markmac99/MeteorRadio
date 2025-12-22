@@ -20,10 +20,12 @@ import wave
 
 FULL_FREQUENCY_BAND = 18000   # Band for psd plot is +/- 18000 Hz
 SPECGRAM_BAND = 500     # Band for displaying specgram plots is +/-500
-DATA_DIR =  os.path.expanduser('~/radar_data')
-ARCHIVE_DIR =  os.path.expanduser('~/radar_data/Archive')
-CAPTURE_DIR =  os.path.expanduser('~/radar_data/Captures')
-JUNK_DIR =  os.path.expanduser('~/radar_data/Junk')
+DATA_DIR = os.path.expanduser(os.getenv('MRDATADIR',default='~/radar_data'))
+ARCHIVE_DIR = os.path.join(DATA_DIR, 'Archive')
+CAPTURE_DIR = os.path.join(DATA_DIR, 'Captures')
+JUNK_DIR =  os.path.join(DATA_DIR, 'Junk')
+IMG_DIR =  os.path.join(DATA_DIR, 'Images')
+AUD_DIR =  os.path.join(DATA_DIR, 'Audio')
 OVERLAP = 0.75           # Overlap (0.75 is 75%)
 
 NUM_FFT = 2**12
@@ -57,6 +59,8 @@ def make_directories() :
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
     os.makedirs(CAPTURE_DIR, exist_ok=True)
     os.makedirs(JUNK_DIR, exist_ok=True)
+    os.makedirs(IMG_DIR, exist_ok=True)
+    os.makedirs(AUD_DIR, exist_ok=True)
 
 class MeteorPlotter() :
 
@@ -91,18 +95,20 @@ class MeteorPlotter() :
         if event.key == 'a':
             os.chmod(self.file_name, S_IREAD|S_IRGRP|S_IROTH)
             try:
-                shutil.move(self.file_name, ARCHIVE_DIR + '/' + os.path.basename(self.file_name))
+                shutil.move(self.file_name, os.path.join(ARCHIVE_DIR, os.path.basename(self.file_name)))
                 audio_file = self.file_name.replace("SPG", "AUD")
                 audio_file = audio_file.replace("npz", "raw")
-                shutil.move(audio_file, ARCHIVE_DIR + '/' + os.path.basename(audio_file))
+                audio_file = os.path.join(AUD_DIR, os.path.basename(audio_file))
+                shutil.move(audio_file, os.path.join(ARCHIVE_DIR,os.path.basename(audio_file)))
             except: pass
             plt.close()
         elif event.key == 'c':
             try:
-                shutil.move(self.file_name, CAPTURE_DIR + '/' + os.path.basename(self.file_name))
+                shutil.move(self.file_name, os.path.join(CAPTURE_DIR, os.path.basename(self.file_name)))
                 audio_file = self.file_name.replace("SPG", "AUD")
                 audio_file = audio_file.replace("npz", "raw")
-                shutil.move(audio_file, CAPTURE_DIR + '/' + os.path.basename(audio_file))
+                audio_file = os.path.join(AUD_DIR, os.path.basename(audio_file))
+                shutil.move(audio_file, os.path.join(ARCHIVE_DIR,os.path.basename(audio_file)))
             except: pass
             plt.close()
 
@@ -113,6 +119,7 @@ class MeteorPlotter() :
                 shutil.move(JUNK_DIR + '/' + os.path.basename(last_deleted_file), last_deleted_file)
                 audio_file = last_deleted_file.replace("SPG", "AUD")
                 audio_file = audio_file.replace("npz", "raw")
+                audio_file = os.path.join(AUD_DIR, os.path.basename(audio_file))
                 shutil.move(JUNK_DIR + '/' + os.path.basename(audio_file), audio_file)
             except Exception as e:
                 print(e)
@@ -126,6 +133,7 @@ class MeteorPlotter() :
                 self.last_deleted_file_queue.put_nowait(self.file_name)
                 audio_file = self.file_name.replace("SPG", "AUD")
                 audio_file = audio_file.replace("npz", "raw")
+                audio_file = os.path.join(AUD_DIR, os.path.basename(audio_file))
                 shutil.move(audio_file, JUNK_DIR + '/' + os.path.basename(audio_file))
             except Exception as e:
                 print(e)
@@ -157,7 +165,7 @@ class MeteorPlotter() :
             plt.close()
         elif event.key == 'S' :                 # S key saves current plot to image
             try:
-                image_filename = DATA_DIR + "/" + os.path.basename(self.file_name.replace("npz", "png"))
+                image_filename = os.path.join(IMG_DIR, os.path.basename(self.file_name.replace("npz", "png")))
                 print("Saving", image_filename)
                 plt.savefig(image_filename)
             except:
@@ -274,7 +282,7 @@ class MeteorPlotter() :
 
         if save_images :
             # Save PSD as an image file
-            image_filename = DATA_DIR + '/PSD_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.png')
+            image_filename = IMG_DIR + '/PSD_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.png')
             print("Saving", image_filename)
             plt.savefig(image_filename)
             plt.close()
@@ -316,7 +324,7 @@ class MeteorPlotter() :
 
         if save_images :
             # Save spectrogram as an image file
-            image_filename = DATA_DIR + '/SPG_' + str(int(centre_freq)) + '_' + str(int(sample_rate)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.png')
+            image_filename = IMG_DIR + '/SPG_' + str(int(centre_freq)) + '_' + str(int(sample_rate)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.png')
             print("Saving", image_filename)
             plt.savefig(image_filename)
 
@@ -337,7 +345,7 @@ class MeteorPlotter() :
 
         if save_images :
             # Save PSD as an image file
-            image_filename = DATA_DIR + '/PSD_' + str(int(centre_freq)) + '_' + str(int(sample_rate)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.png')
+            image_filename = IMG_DIR + '/PSD_' + str(int(centre_freq)) + '_' + str(int(sample_rate)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.png')
             print("Saving", image_filename)
             plt.savefig(image_filename)
 
@@ -348,11 +356,12 @@ class MeteorPlotter() :
 
         # Save to file as 16-bit signed single-channel audio samples
         # Note that we can throw away the imaginary part of the IQ sample data for USB
+        basename = os.path.basename(file_name)
         if 'SMP' in file_name:
-            audio_filename = file_name.replace("SMP", "AUD")
+            audio_filename = basename.replace("SMP", "AUD")
         else:
-            audio_filename = file_name.replace("SPG", "AUD")
-        audio_filename = audio_filename.replace("npz", "raw")
+            audio_filename = basename.replace("SPG", "AUD")
+        audio_filename = os.path.join(AUD_DIR, audio_filename.replace("npz", "raw"))
         wav_filename = audio_filename.replace("raw", "wav")
         print("Saving", wav_filename)
         x7.astype("int16").tofile(audio_filename)
@@ -579,7 +588,7 @@ if __name__ == "__main__":
                 if sample_rate is not None : bins /= sample_rate
                 f = npz_data['f']
                 Pxx = npz_data['Pxx']
-
+                meteor_plotter.set_colour(colour_scheme)
                 meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=False)
                 # if show_3d : plot_3dspecgram(Pxx, f, bins, centre_freq)
 
@@ -616,6 +625,7 @@ if __name__ == "__main__":
                     if file_index == num_smp_files-1 :
                         os._exit(0)
                 else:
+                    meteor_plotter.set_colour(colour_scheme)
                     meteor_plotter.plot_specgram(Pxx, f, bins, centre_freq, obs_time, flipped=False)
 
 
