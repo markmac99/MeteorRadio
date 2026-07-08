@@ -23,10 +23,11 @@ import argparse
 from multiprocessing import Process, Queue as mpQueue
 from waterfall import Waterfall
 
-DATA_DIR =  os.path.expanduser('~/radar_data/')
-CAPTURES_DIR = DATA_DIR + 'Captures/'
-ARCHIVE_DIR = DATA_DIR + 'Archive/'
-LOG_DIR = DATA_DIR + 'Logs/'
+DATA_DIR = os.path.expanduser(os.getenv('MRDATADIR',default='~/radar_data'))
+ARCHIVE_DIR = os.path.join(DATA_DIR, 'Archive')
+CAPTURES_DIR = os.path.join(DATA_DIR, 'Captures')
+LOG_DIR =  os.path.join(DATA_DIR, 'Logs')
+
 CONFIG_FILE = os.path.expanduser('~/.radar_config')
 DISK_SPACE_TO_LEAVE = 1e9   # Spare bytes to leave on disk 1GB
 
@@ -102,9 +103,9 @@ class DiskSpaceChecker(threading.Thread):
                 continue
 
             # Get the list of files that can be cleaned and sort them by mtime
-            radio_files = glob.glob(DATA_DIR + '**/SMP*.npz', recursive=True)
-            radio_files += glob.glob(DATA_DIR + '**/SPG*.npz', recursive=True)
-            radio_files += glob.glob(DATA_DIR + '**/AUD*.raw', recursive=True)
+            radio_files = glob.glob(DATA_DIR + '/**/SMP*.npz', recursive=True)
+            radio_files += glob.glob(DATA_DIR + '/**/SPG*.npz', recursive=True)
+            radio_files += glob.glob(DATA_DIR + '/**/AUD*.raw', recursive=True)
             radio_files = sorted(radio_files, key=os.path.getmtime)
 
             # Remove the oldest observation files until the disk has enough space again
@@ -177,15 +178,15 @@ class RMBLogger():
     def log_data(self,obs_time,Bri,Dur,freq) :
         filename = "R" + obs_time.strftime("%Y%m%d_") + self.config_reader.id + ".csv"
         try:
-            rmb_file = open(LOG_DIR + filename, "r")
+            rmb_file = open(os.path.join(LOG_DIR, filename), "r")
             rmb_file.close()
         except:
-            rmb_file = open(LOG_DIR + filename, "a")
+            rmb_file = open(os.path.join(LOG_DIR, filename), "a")
             rmb_file.write("Ver,Y,M,D,h,m,s,Bri,Dur,freq,ID,Long,Lat,Alt,Tz\n")
             rmb_file.close()
 
         try:
-            rmb_file = open(LOG_DIR + filename, "a")
+            rmb_file = open(os.path.join(LOG_DIR, filename), "a")
             rmb_string = '{0:s},{1:s},{2:.2f},{3:.2f},{4:.2f},{5:s},{6:.5f},{7:.5f},{8:.1f},{9:d}\n'.format(self.config_reader.Ver, obs_time.strftime("%Y,%m,%d,%H,%M,%S.%f")[:-3], Bri, Dur, freq, self.config_reader.id, self.config_reader.Long, self.config_reader.Lat, self.config_reader.Alt, self.config_reader.Tz)
             syslog.syslog(syslog.LOG_DEBUG, "Writing to RMB file " + filename + " " + rmb_string)
             rmb_file.write(rmb_string)
@@ -203,10 +204,10 @@ class MonthlyCsvLogger():
 
         try:
             filename = obs_time.strftime('%Y-%m.csv')
-            csv_file = open(LOG_DIR + filename, "r")
+            csv_file = open(os.path.join(LOG_DIR, filename), "r")
             csv_file.close()
         except:
-            csv_file = open(LOG_DIR + filename, "a")
+            csv_file = open(os.path.join(LOG_DIR, filename), "a")
             csv_file.write("user_ID,date,time,signal,noise,frequency,durationc,durations,lat,long,source,timesync,snratio,doppler_estimate\n")
             csv_file.close()
 
@@ -220,7 +221,7 @@ class MonthlyCsvLogger():
             if verbose : print("csv output:", output_line)
 
             filename = obs_time.strftime('%Y-%m.csv')
-            csv_file = open(LOG_DIR + filename, "a")
+            csv_file = open(os.path.join(LOG_DIR, filename), "a")
             csv_file.write(output_line)
             csv_file.close()
         except Exception as e :
@@ -537,7 +538,7 @@ class SampleAnalyser(threading.Thread):
 
         # Change the capture directory to Captures/{date} if required
         if capturetodated :
-            self.captures_dir = CAPTURES_DIR + obs_time.strftime('%Y%m%d') +'/'
+            self.captures_dir = os.path.join(CAPTURES_DIR, obs_time.strftime('%Y%m%d'))
             os.makedirs(self.captures_dir, exist_ok=True)
             pass
 
@@ -575,7 +576,8 @@ class SampleAnalyser(threading.Thread):
         decimated_samples = scipy_signal.decimate(raw_samples, DECIMATION)
 
         # Save the decimated raw samples
-        sample_filename = self.captures_dir + '/SMP_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.npz')
+        smp_filename = f"SMP_{centre_freq}_{obs_time.strftime('%Y%m%d_%H%M%S_%f')}.npz"        
+        sample_filename = os.path.join(self.captures_dir, smp_filename)
         syslog.syslog(syslog.LOG_DEBUG, "Saving " + sample_filename)
         print("Saving", sample_filename)
         np.savez(sample_filename, obs_time=str(obs_time), centre_freq=centre_freq, sample_rate=self.decimated_sample_rate, samples=np.array(decimated_samples).astype("complex64"))
@@ -636,7 +638,8 @@ class SampleAnalyser(threading.Thread):
         # bins -= time_before_trigger
 
         # Save the data
-        specgram_filename = self.captures_dir + '/SPG_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.npz')
+        spg_filename = f"SPG_{centre_freq}_{obs_time.strftime('%Y%m%d_%H%M%S_%f')}.npz"
+        specgram_filename = os.path.join(self.captures_dir, spg_filename)
         syslog.syslog(syslog.LOG_DEBUG, "Saving " + specgram_filename)
         print("Saving", specgram_filename)
         np.savez(specgram_filename, Pxx=Pxx, f=f, bins=bins)
@@ -656,7 +659,8 @@ class SampleAnalyser(threading.Thread):
 
         # Save to file as 16-bit signed single-channel audio samples
         # Note that we can throw away the imaginary part of the IQ sample data for USB
-        wav_filename = self.captures_dir + '/AUD_' + str(int(centre_freq)) + obs_time.strftime('_%Y%m%d_%H%M%S_%f.wav')
+        aud_filename = f"AUD_{centre_freq}_{obs_time.strftime('%Y%m%d_%H%M%S_%f')}.wav"
+        wav_filename = os.path.join(self.captures_dir, aud_filename)
         syslog.syslog(syslog.LOG_DEBUG, "Saving " + wav_filename)
         print("Saving", wav_filename)
 
