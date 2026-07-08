@@ -122,17 +122,23 @@ class DiskSpaceChecker(threading.Thread):
             time.sleep(1800)
 
 
-# Class for logging detections to RMOB file
-class RMBLogger():
+# Class for getting items from the config file
+class ConfigurationReader():
 
     def __init__(self):
 
         self.id = ""
-        self.Long = 0.0
+        self.id_num = 0
         self.Lat = 0.0
+        self.Long = 0.0
         self.Alt = 0.0
+        self.foff = 0.0
+        self.tx_source = ""
+        self.time_sync = ""
         self.Ver = "RMOB"
         self.Tz = 0
+        self.country = ""
+        self.region = ""
 
         self.get_config()
 
@@ -146,6 +152,12 @@ class RMBLogger():
                     if line_words[0] == 'latitude'  : self.Lat = float(line_words[1])
                     if line_words[0] == 'longitude' : self.Long = float(line_words[1])
                     if line_words[0] == 'elevation' : self.Alt = float(line_words[1])
+                    if line_words[0] == 'ID_NUM'    : self.id_num = line_words[1]
+                    if line_words[0] == 'foff'      : self.foff = float(line_words[1])
+                    if line_words[0] == 'TxSource'  : self.tx_source = line_words[1]
+                    if line_words[0] == 'TimeSync'  : self.time_sync = line_words[1]
+                    if line_words[0] == 'country'   : self.country = line_words[1]
+                    if line_words[0] == 'region'    : self.region = line_words[1]
 
         except Exception as e :
             print(e)
@@ -153,10 +165,17 @@ class RMBLogger():
         # print(self.id,self.Lat,self.Long,self.Alt)
 
 
+# Class for logging detections to RMOB file
+class RMBLogger():
+
+    def __init__(self):
+        self.config_reader = ConfigurationReader()
+
+
     # Write to RMB format R<date>_<location>.csv file as:
     # Ver,Y,M,D,h,m,s,Bri,Dur,freq,ID,Long,Lat,Alt,Tz
     def log_data(self,obs_time,Bri,Dur,freq) :
-        filename = "R" + obs_time.strftime("%Y%m%d_") + self.id + ".csv"
+        filename = "R" + obs_time.strftime("%Y%m%d_") + self.config_reader.id + ".csv"
         try:
             rmb_file = open(LOG_DIR + filename, "r")
             rmb_file.close()
@@ -167,7 +186,7 @@ class RMBLogger():
 
         try:
             rmb_file = open(LOG_DIR + filename, "a")
-            rmb_string = '{0:s},{1:s},{2:.2f},{3:.2f},{4:.2f},{5:s},{6:.5f},{7:.5f},{8:.1f},{9:d}\n'.format(self.Ver, obs_time.strftime("%Y,%m,%d,%H,%M,%S.%f")[:-3], Bri, Dur, freq, self.id, self.Long, self.Lat, self.Alt, self.Tz)
+            rmb_string = '{0:s},{1:s},{2:.2f},{3:.2f},{4:.2f},{5:s},{6:.5f},{7:.5f},{8:.1f},{9:d}\n'.format(self.config_reader.Ver, obs_time.strftime("%Y,%m,%d,%H,%M,%S.%f")[:-3], Bri, Dur, freq, self.config_reader.id, self.config_reader.Long, self.config_reader.Lat, self.config_reader.Alt, self.config_reader.Tz)
             syslog.syslog(syslog.LOG_DEBUG, "Writing to RMB file " + filename + " " + rmb_string)
             rmb_file.write(rmb_string)
             rmb_file.close()
@@ -178,33 +197,7 @@ class RMBLogger():
 # Class for logging detections to monthly csv file
 class MonthlyCsvLogger():
     def __init__(self):
-
-        self.id = ""
-        self.Lat = 0.0
-        self.Long = 0.0
-        self.foff = 0.0
-        self.tx_source = ""
-        self.time_sync = ""
-
-        self.get_config()
-
-    def get_config(self) :
-        config_file_name = CONFIG_FILE
-        try:
-            with open(config_file_name) as fp:
-                for cnt, line in enumerate(fp):
-                    line_words = (re.split("[: \n]+", line))
-                    if line_words[0] == 'ID_NUM'    : self.id = line_words[1]
-                    if line_words[0] == 'latitude'  : self.Lat = float(line_words[1])
-                    if line_words[0] == 'longitude' : self.Long = float(line_words[1])
-                    if line_words[0] == 'foff'      : self.foff = float(line_words[1])
-                    if line_words[0] == 'TxSource'  : self.tx_source = line_words[1]
-                    if line_words[0] == 'TimeSync'  : self.time_sync = line_words[1]
-
-        except Exception as e :
-            print(e)
-            syslog.syslog(syslog.LOG_DEBUG, str(e))
-
+        self.config_reader = ConfigurationReader()
 
     def log_data(self, obs_time, centre_freq, frequency, signal, noise, duration, max_snr) :
 
@@ -220,10 +213,10 @@ class MonthlyCsvLogger():
         try:
             date = obs_time.strftime('%Y-%m-%d')
             time = obs_time.strftime('%H:%M:%S.%f')
-            doppler_estimate = int((float(frequency)) - float(centre_freq) - self.foff)
-            offset_frequency = int(2000 + (float(frequency)) - float(centre_freq) - self.foff)
+            doppler_estimate = int((float(frequency)) - float(centre_freq) - self.config_reader.foff)
+            offset_frequency = int(2000 + (float(frequency)) - float(centre_freq) - self.config_reader.foff)
 
-            output_line = "%s,%s,%s,%.3f,%.3f,%s,%s,%.2f,%.2f,%.2f,%s,%s,%.2f,%s\n" % (self.id, date, time, signal, noise, offset_frequency, '0', duration, self.Lat, self.Long, self.tx_source, self.time_sync, max_snr, doppler_estimate)
+            output_line = "%s,%s,%s,%.3f,%.3f,%s,%s,%.2f,%.2f,%.2f,%s,%s,%.2f,%s\n" % (self.config_reader.id_num, date, time, signal, noise, offset_frequency, '0', duration, self.config_reader.Lat, self.config_reader.Long, self.config_reader.tx_source, self.config_reader.time_sync, max_snr, doppler_estimate)
             if verbose : print("csv output:", output_line)
 
             filename = obs_time.strftime('%Y-%m.csv')
@@ -416,7 +409,11 @@ class SampleAnalyser(threading.Thread):
         psd_queue = mpQueue(maxsize=4)
 
         # Get the first set of samples
-        samples = sample_queue.get()
+        try:
+            samples = sample_queue.get(timeout=10)
+        except Queue.Empty as e:
+            syslog.syslog(syslog.LOG_DEBUG, str(e))
+
 
         # Initialise SDR frequency centre variables
         self.sdr_freq = sdr.center_freq
@@ -458,7 +455,11 @@ class SampleAnalyser(threading.Thread):
         # Get samples from the queue as they arrive, analyse them and check for a detection trigger
         while True :
             # print("Queue lengths", sample_queue.qsize(), psd_queue.qsize())
-            samples = sample_queue.get()
+            try:
+                samples = sample_queue.get(timeout=10)
+            except Queue.Empty as e:
+                syslog.syslog(syslog.LOG_DEBUG, str(e))
+
 
             # Do the PSD analysis in a thread. If the queue is full then we must skip to the next set of samples
             if not psd_queue.full() :
@@ -585,8 +586,7 @@ class SampleAnalyser(threading.Thread):
         sft = ShortTimeFFT(window, hop=HOP, fs=self.sdr_sample_rate, mfft=NUM_FFT, fft_mode='centered')
         Pxx = sft.spectrogram(raw_samples)
 
-        T_x, N = HOP / sample_rate, Pxx.shape[1]
-        bins = np.arange(N) * T_x
+        bins = sft.t(len(raw_samples))
 
         f = sft.f
         f = f/1e6 + self.sdr_freq_mhz
@@ -605,24 +605,24 @@ class SampleAnalyser(threading.Thread):
     def save_fft(self, samples_forspecgram, sda_centre_freq, centre_freq, sample_rate, obs_time) :
 
         # Create the specgram
-        if self.decimate_before_saving :
+        if self.decimate_before_saving:
             decimated_samples = scipy_signal.decimate(samples_forspecgram, DECIMATION)
             # Pxx, f, bins = specgram(decimated_samples, NFFT=int(NUM_FFT/DECIMATION), Fs=self.decimated_sample_rate/1e6, noverlap=int(OVERLAP*(NUM_FFT/DECIMATION)))
-            window = hamming(int(NUM_FFT/DECIMATION), sym=True)  # symmetric Gaussian window
-            sft = ShortTimeFFT(window, hop=HOP, fs=self.sdr_sample_rate, mfft=int(NUM_FFT/DECIMATION), fft_mode='centered')
+            window = hamming(NUM_FFT/DECIMATION, sym=True)  # symmetric Gaussian window
+            sft = ShortTimeFFT(window, hop=HOP, fs=self.sdr_sample_rate, mfft=NUM_FFT/DECIMATION, fft_mode='centered')
             Pxx = sft.spectrogram(decimated_samples)
             f = sft.f
+            bins = sft.t(len(decimated_samples))
 
         else:
             window = hamming(NUM_FFT, sym=True)  # symmetric Gaussian window
             sft = ShortTimeFFT(window, hop=HOP, fs=self.sdr_sample_rate, mfft=NUM_FFT, fft_mode='centered')
             Pxx = sft.spectrogram(samples_forspecgram)
             f = sft.f
+            bins = sft.t(len(samples_forspecgram))
 
         f = f/1e6 + self.sdr_freq_mhz
         
-        T_x, N = HOP / sample_rate, Pxx.shape[1]
-        bins = np.arange(N) * T_x
 
         # Restrict the band for saving to a band around the required centre frequency
         freq_slice = np.where((f >= (centre_freq-COMPRESSION_FREQUENCY_BAND)/1e6) & (f <= (centre_freq+COMPRESSION_FREQUENCY_BAND)/1e6))
@@ -786,9 +786,11 @@ async def streaming():
     sdr.sample_rate = SAMPLE_RATE
     sdr.center_freq = centre_freq + FREQUENCY_OFFSET       # Tuning frequency for SDR
     # sdr.set_bandwidth(10e3)
-    if sdr_gain == 'auto' : sdr.gain = sdr_gain
-    else: sdr.gain = float(sdr_gain)
-    # sdr.freq_correction = 0.0      # PPM
+    if sdr_gain == 'auto':
+        sdr.gain = sdr_gain
+    else:
+        sdr.gain = float(sdr_gain)
+    # sdr.freq_correction = 0.0      # PPM - this error correction does not provide enough resolution to be useful e.g. for small frequency errors of < 100 Hz
 
     # Loop forever taking samples
     async for samples in sdr.stream():
@@ -800,10 +802,13 @@ async def streaming():
         sample_queue.put(samples)
 
         # Add the sample data to the waterfall queue for the waterfall display
-        try:
-            if waterfall_queue.full() : waterfall_queue.get_nowait()
-            waterfall_queue.put_nowait(samples)
-        except: pass
+        if display_waterfall:
+            try:
+                if waterfall_queue.full():
+                    waterfall_queue.get_nowait()
+                waterfall_queue.put_nowait(samples)
+            except:
+                pass
 
     # to stop streaming:
     await sdr.stop()
@@ -826,6 +831,7 @@ if __name__ == "__main__":
     ap.add_argument("-f", "--frequency", type=float, default=143.05e6, help="Centre frequency. Default is GRAVES (143.05 MHz)")
     ap.add_argument("-g", "--gain", type=str, default=str(SDR_GAIN), help="SDR tuner gain (0-50, auto). Default is 50")
     ap.add_argument("-s", "--snr_threshold", type=float, default=45, help="SNR threshold. Default is 45 (~16 dB)")
+    ap.add_argument("--sdrserialnum", type=int, default=None, help="SDR Serial number. For systems with multiple SDR's")
     ap.add_argument("-r", "--raw", action='store_true', default=True, help="Store raw sample data - default")
     ap.add_argument("--fft", action='store_true', help="Store data as FFT")
     ap.add_argument("-a", "--audio", action='store_true', help="Enable saving of audio wav file")
@@ -849,8 +855,9 @@ if __name__ == "__main__":
     verbose = args['verbose']
     detection_frequency_band = args['detectionband']
     noise_calculation_band = args['noiseband']
+    sdr_serial_number = args['sdrserialnum']
 
-    if save_fft_samples :
+    if save_fft_samples:
         save_raw_samples = False
 
     # Set up the logging
@@ -858,7 +865,7 @@ if __name__ == "__main__":
 
     print("Detection frequency:", centre_freq)
     print("SNR threshold:", snr_threshold)
-    if save_raw_samples :
+    if save_raw_samples:
         print("Saving raw sample data")
     else:
         print("Saving data in FFT format")
@@ -876,7 +883,16 @@ if __name__ == "__main__":
     waterfall_queue = mpQueue(maxsize=1)
 
     # Create the SDR instance
-    sdr = RtlSdr()
+    if sdr_serial_number is None:
+        sdr = RtlSdr()
+    else:
+        # Get a list of available SDR serial numbers
+        serial_numbers = RtlSdr.get_device_serial_addresses()
+        print("Available SDR serial numbers:", serial_numbers)
+
+        # Find the device index for the given serial number
+        device_index = RtlSdr.get_device_index_by_serial(str(sdr_serial_number))
+        sdr = RtlSdr(device_index)
 
     # Start the sample analyser
     sample_analyser = SampleAnalyser(centre_freq)
@@ -887,7 +903,7 @@ if __name__ == "__main__":
     diskspacechecker.start()
 
     # Start the waterfall display
-    if  display_waterfall :
+    if  display_waterfall:
         p = Waterfall(centre_freq + FREQUENCY_OFFSET, SAMPLE_RATE, waterfall_queue)
         p.start()
 

@@ -14,13 +14,13 @@ Recommended HB9-2 HB9CV 2 ELEMENT ANTENNA for the GRAVES frequency 143.05 MHz.
 
 #### RPi control box
 A Raspberry Pi 3B or 4, with one available USB port. Power supply. 8GB or larger SD Card.
-Recommended OS is Raspbian Bookworm.
+Recommended OS is Raspbian Bookworm or Trixie.
 
 A wifi or wired ethernet connection to the internet is required to maintain the NTP time.
 
 ## Software
 ### Acquisition and Detection Software
-The software uses Python3.
+The software uses python3.
 The acquisition software reads the raw data from the USB radio and does a fast fourier transform (FFT) on each sample block as it is received. The FFT of each sample block is then analysed to check for a peak signal above the SNR threshold at a frequency +/- 120 Hz of the target frequency (GRAVES 143.05 MHz).
 After each detection trigger, the software stores the raw sample data for the next 10 seconds as an SMP file. If the --fft option is used, the detection data is stored in 2 files, the raw audio data in the form of a raw audio file, and the FFT data in the form of an SPG numpy npz file.
 
@@ -65,6 +65,14 @@ Audio and FFT detection files are about 800 kB in size.
 #### Radio Tuning
 The software tunes the USB software radio to a central frequency 2 kHz below the required frequency. This is so that a meteor detection yields an approximately 2 kHz audible tone on the upper sideband. The default frequency for radio meteor detection is the frequency of the GRAVES transmitter 143.05 MHz. The required frequency can be changed using the -f option.
 
+Many SDR's have a tuning frequency error. While this may only be an offset error of 100 Hz or so, and since the detection band is quite narrow (-120 to +120 Hz), it could impact on whether the system can get any detections. The --detectionband command line option can be used to extend the range of frequencies, or to move the detection band dependent upon the offset error of the SDR. For example, add the option to the normal command used to start detecting meteor radio data:
+
+```
+# Widen the detection band to +/- 200 Hz either side of the central frequency (e.g. GRAVES 143.05 MHz)
+--detectionband -200 +200
+# Lower the detection band by 100 Hz to -220 to +20 Hz (e.g. if the SDR has an offset error of -100 Hz)
+--detectionband -220 20
+```
 
 #### Resource Usage and Performance
 The acquisition software uses about 50% of one CPU core of the Pi4, and about 90% of one core on a Pi3b.
@@ -78,18 +86,21 @@ The analyse_detection.py matplotlib tool can be used to visualise and analyse th
 
 ### Installation
 The software uses the pyrtlsdr package for reading the USB data from the RTL SDR dongle. It also needs python-matplotlib and numpy for the FFT routines.
-The required python modules can be installed with the installation commands below, and has been tested on Raspbian Bookworm:
+The required python modules can be installed with the installation commands below, and has been tested on Raspbian Bookworm and Trixie:
 ```
-# Clone this repository
-git clone https://github.com/rabssm/MeteorRadio.git
-
 # Install required apt packages
 sudo apt update && sudo apt install rtl-sdr libopenblas-dev
 
-# Create a virtual environmemt in which to install and run the software
-python -m venv ~/vMeteorRadio
-source ~/vMeteorRadio/bin/activate
-cd MeteorRadio
+# Create a virtual environmemt in which to run the software
+python -m venv $HOME/vMeteorRadio
+source $HOME/vMeteorRadio/bin/activate
+
+# Clone this repository and install the requirements
+cd $HOME
+git clone https://github.com/rabssm/MeteorRadio.git
+
+# Change into the MeteorRadio directory and install the package requirements
+cd $HOME/MeteorRadio
 pip install -r requirements.txt
 ```
 
@@ -152,10 +163,12 @@ Data provided for https://radiometeordetection.org/
 A python script is provided to produce output data to allow use by the RMOB colorgramme software to produce an RMOB colorgramme for upload to RMOB.
 
 ```
-python monthly_rmob.py -y 2022 -m 10 -o Observer
+~/vMeteorRadio/bin/python monthly_rmob.py -y 2022 -m 10 -o Observer
 ```
 
 ## Running the acquisition software
+
+The python scripts are located at $HOME/MeteorRadio/src if you cloned the repository from the $HOME directory.
 
 To get help using the acquisition software, run the command:
 ```
@@ -174,12 +187,12 @@ python analyse_detection.py ~/radar_data
 
 To visualise the monthly meteor detections recorded in the directory ~/radar_data/Logs :
 ```
-python monthly_graph.py
+~/vMeteorRadio/bin/python monthly_graph.py
 ```
 ![alt text](https://github.com/rabssm/MeteorRadio/blob/main/doc/Radio_Meteor_Detections_2025-12.png)
 
 
-The raw sample audio files have a sample rate of 37.5k. They can be converted to .wav files using sox or played :
+The raw sample audio files have a sample rate of 37.5k. They can be converted to .wav files using sox or played:
 ```
 sox -r 37.5k -b 16 -e signed-integer -c 1 <audio_file.raw> <audio_file.wav>
 
@@ -198,8 +211,8 @@ To make the software run automatically on every boot, add the command to crontab
 crontab -e
 ```
 
-Then add the following line at the end of the crontab (e.g.) :
+Then add the following line at the end of the crontab (e.g.):
 ```
-@reboot sleep 60 && ~/vMeteorRadio/bin/python -u ~/source/MeteorRadio/src/meteor_radar.py -s 40 -g 50
+@reboot sleep 60 && ~/vMeteorRadio/bin/python -u ~/MeteorRadio/src/meteor_radar.py -s 40 -g 50
 ```
 
