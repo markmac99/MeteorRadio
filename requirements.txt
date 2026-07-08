@@ -2,5 +2,7 @@ numpy>=2.2.3
 scipy>=1.15.1
 matplotlib>=3.10.0
 pandas>=2.2.3
-pyrtlsdr>=0.3.0
-
+# need to pin to 0.3.0 as later releases expect features not present in 
+# the main fork of rtlsdr
+pyrtlsdr==0.3.0
+pip install setuptools==69.5.1
